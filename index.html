@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Auditor de Presupuesto de Rastreo e Inflación de Índice — IMPERIA Hub</title>
+<meta name="description" content="Simulador profesional de presupuesto de rastreo (Crawl Budget) de Googlebot. Calcule capacidad de rastreo, retrasos TTFB, penalizaciones JS y velocidad de indexación.">
+<style>
+:root {
+  --primary: #0284c7;
+  --primary-hover: #0369a1;
+  --success: #10b981;
+  --danger: #ef4444;
+  --bg: #f4f6f9;
+  --card-bg: #ffffff;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --accent: #f59e0b;
+  --purple: #8b5cf6;
+  --slate: #334155;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+body { background: var(--bg); color: var(--text); padding: 20px; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+.wrapper { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 24px; width: 100%; max-width: 550px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+h1 { font-size: 21px; font-weight: 700; margin-bottom: 4px; text-align: center; letter-spacing: -0.025em; }
+.subtitle { font-size: 13px; color: var(--text-muted); text-align: center; margin-bottom: 20px; }
+.live-meter { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin-bottom: 20px; text-align: center; }
+.meter-label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; margin-bottom: 6px; letter-spacing: 0.05em; }
+.bar-container { background: var(--border); border-radius: 20px; height: 12px; width: 100%; overflow: hidden; position: relative; }
+.bar-fill { background: var(--primary); width: 0%; height: 100%; transition: all 0.4s ease; }
+.group { margin-bottom: 16px; }
+label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--text); }
+select, input[type="number"] { width: 100%; padding: 11px; border: 1px solid var(--border); border-radius: 10px; font-size: 14px; background: #fff; color: var(--text); transition: border 0.2s; }
+select:focus, input:focus { border-color: var(--primary); outline: none; }
+input[type="range"] { width: 100%; margin: 8px 0; cursor: pointer; }
+.range-val { font-size: 14px; font-weight: 700; color: var(--primary); float: right; }
+.calc-btn { width: 100%; padding: 14px; background: var(--primary); color: #fff; border: none; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; margin-top: 10px; box-shadow: 0 4px 6px -1px rgba(2,132,199,0.2); transition: background 0.2s; }
+.calc-btn:hover { background: var(--primary-hover); }
+.copy-btn { width: 100%; padding: 11px; background: #f8fafc; color: var(--slate); border: 1px solid var(--border); border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; margin-top: 10px; transition: all 0.2s; }
+.copy-btn:hover { background: #e2e8f0; }
+.skynet-box { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 12px; padding: 14px; margin-top: 20px; display: none; }
+.skynet-title { font-size: 12px; font-weight: 700; color: var(--danger); margin-bottom: 6px; text-transform: uppercase; text-align: center; letter-spacing: 0.05em; }
+.results { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 20px; display: none; }
+.results-title { font-size: 13px; font-weight: 700; color: var(--text-muted); margin-bottom: 10px; text-align: center; text-transform: uppercase; letter-spacing: 0.05em; }
+.res-row { display: flex; justify-content: space-between; padding: 8px 0; font-size: 14px; border-bottom: 1px dashed var(--border); align-items: center; }
+.res-row:last-child { border-bottom: none; }
+.res-val { font-weight: 700; color: var(--primary); text-align: right; max-width: 65%; }
+.partner-btn { display: block; width: 100%; padding: 11px; background: #fff; border: 1px solid var(--purple); color: var(--purple); border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.2s; text-align: center; margin-top: 12px; text-decoration: none; }
+.partner-btn:hover { background: var(--purple); color: #fff; }
+.math-log-box { background: #f1f5f9; border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 12px; font-family: monospace; font-size: 12px; color: var(--slate); display: none; }
+.seo-text { font-size: 12px; color: var(--text-muted); margin-top: 24px; text-align: justify; line-height: 1.4; border-top: 1px solid var(--border); padding-top: 16px; display: none; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+  <h1>Auditor de Crawl Budget</h1>
+  <div class="subtitle">Simulación de Capacidad de Googlebot, Index Bloat y Renderizado WRS</div>
+
+  <div class="live-meter">
+    <div class="meter-label">Estado de Indexación del Sitio: <span id="live-preview-zone">Esperando parámetros</span></div>
+    <div class="bar-container"><div class="bar-fill" id="bar-fill"></div></div>
+  </div>
+
+  <div class="group">
+    <label for="total-urls">Total de URLs Descubiertas en Sitemap / Índice</label>
+    <input type="number" id="total-urls" value="15000" min="1" max="10000000" oninput="updatePreview()">
+  </div>
+
+  <div class="group">
+    <label for="useful-urls">Páginas Principales / Comerciales de Alto Valor</label>
+    <input type="number" id="useful-urls" value="3500" min="1" max="10000000" oninput="updatePreview()">
+    <span style="font-size: 11px; color: var(--text-muted);">La diferencia entre las URL totales y útiles representa basura técnica (paginación, etiquetas, filtros)</span>
+  </div>
+  <div class="group">
+    <label for="server-ttfb">Tiempo Promedio de Respuesta del Servidor TTFB (ms) <span class="range-val" id="ttfb-val">350 ms</span></label>
+    <input type="range" id="server-ttfb" min="30" max="2500" value="350" step="10" oninput="document.getElementById('ttfb-val').innerText=this.value+' ms'; updatePreview();">
+    <span style="font-size: 11px; color: var(--text-muted);">Referencia para indexación instantánea: &lt; 200 ms (GitHub Pages / NVMe VPS)</span>
+  </div>
+
+  <div class="group">
+    <label for="render-type">Arquitectura de Renderizado de Páginas (Factor WRS)</label>
+    <select id="render-type" onchange="updatePreview()">
+      <option value="static">HTML Estático Puro / SSR (Lectura instantánea sin colas)</option>
+      <option value="cms">CMS Estándar con Plugins (WordPress / Shopify, carga moderada)</option>
+      <option value="spa-js">Client-Side JS Pesado (React / Vue / Angular sin SSR, penalización WRS x9)</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <label for="click-depth">Profundidad Promedio de Clics (Click Depth desde la Home)</label>
+    <select id="click-depth" onchange="updatePreview()">
+      <option value="1">1–2 Clics (Arquitectura plana, máxima prioridad de rastreo)</option>
+      <option value="3">3 Clics (Jerarquía estándar, decaimiento moderado de autoridad)</option>
+      <option value="4">4+ Clics (Aislamiento profundo, el bot pasa cada varios meses)</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <label for="domain-dr">Autoridad del Dominio (Ahrefs DR / Confianza de Enlaces) <span class="range-val" id="dr-val">25</span></label>
+    <input type="range" id="domain-dr" min="0" max="100" value="25" oninput="document.getElementById('dr-val').innerText=this.value; updatePreview();">
+  </div>
+
+  <button class="calc-btn" onclick="calculateCrawlBudget()">Ejecutar Auditoría de Crawl Budget</button>
+
+  <div class="results" id="results-box">
+    <div class="results-title">Analítica de Capacidad de Googlebot</div>
+    <div class="res-row"><span>Inflación de Índice (Index Bloat):</span><span class="res-val" id="res-bloat" style="color:var(--danger)">0%</span></div>
+    <div class="res-row"><span>Capacidad Diaria de Rastreo:</span><span class="res-val" id="res-capacity">0 págs/día</span></div>
+    <div class="res-row"><span>Eficiencia Útil del Presupuesto:</span><span class="res-val" id="res-efficiency" style="color:var(--success)">0%</span></div>
+    <div class="res-row"><span>Ciclo Completo de Rastreo del Dominio:</span><span class="res-val" id="res-full-crawl" style="color:var(--purple)">0 días</span></div>
+    <div class="res-row"><span>Pronóstico de Indexación de Nuevo Artículo:</span><span class="res-val" id="res-index-speed" style="color:var(--primary)">0 minutos</span></div>
+
+    <div class="math-log-box" id="math-log-container"></div>
+    <button class="copy-btn" id="copy-report-btn" onclick="copyAuditReport()">📋 Copiar Reporte Técnico para Cliente / Ticket</button>
+    <a href="https://amazon.com" target="_blank" class="partner-btn" id="partner-link">🚀 Seleccionar Servidores NVMe Rápidos y Hardware de Red</a>
+  </div>
+
+  <div class="skynet-box" id="skynet-container">
+    <div class="skynet-title">🔮 Veredicto Algorítmico sobre Pérdidas de Indexación</div>
+    <div class="res-row" style="border-bottom:none; color:#991b1b; font-size:12px; text-align:justify;"><span id="skynet-verdict">Esperando análisis de latencia del servidor y arquitectura de URLs basura.</span></div>
+  </div>
+
+  <div id="ads" class="ad-banner"><div id="container-e8c895e6c70ade8e4ef4a72354f42e97"></div></div>
+
+  <div class="seo-text" id="seo-box">
+    Nuestra calculadora profesional en línea de Presupuesto de Rastreo (Crawl Budget) e Inflación de Índice (Index Bloat) ofrece una metodología técnica abierta para evaluar el rendimiento de los rastreadores de motores de búsqueda. El motor de simulación subyacente modela el equilibrio exacto entre la Capacidad de Rastreo (regida por la latencia del Tiempo hasta el Primer Byte TTFB y la sobrecarga de ejecución de JavaScript del Servicio de Renderizado Web WRS) y la Demanda de Rastreo (impulsada por métricas de autoridad de dominio y la arquitectura interna de profundidad de clics). Creada para arquitectos SEO técnicos y operadores de redes PBN, esta herramienta aísla cuellos de botella estructurales antes de que las páginas comerciales queden atrapadas en el estado "Descubierta: actualmente sin indexar". Todos los cálculos se ejecutan 100% localmente en su navegador sin enviar registros del servidor ni métricas confidenciales a rastreadores de terceros.
+  </div>
+</div>
+
+<script>
+window.onload = function() {
+  updatePreview();
+};
+
+window.lastAdShowTime = 0;
+
+// MÓDULO IMPERIA ANTI-FRAUDE Y PROTECCIÓN DE ANUNCIOS (ANTI-BAN)
+function showAdsFunc() {
+  if (navigator.webdriver || !navigator.userAgent || navigator.userAgent.includes("Speed Insights") || navigator.userAgent.includes("Lighthouse")) {
+    return false;
+  }
+  const currentTime = Date.now();
+  if (currentTime - window.lastAdShowTime < 60000) {
+    return false;
+  }
+  const c = document.getElementById('ads');
+  if (!c) return false;
+
+  if (!window.adScriptLoaded) {
+    window.atOptions = {'key':'e8c895e6c70ade8e4ef4a72354f42e97','format':'iframe','height':90,'width':728,'params':{} };
+    try {
+      var s = document.createElement('script');
+      s.type = 'text/javascript'; s.async = true;
+      s.src = ['https://', 'bagelstoppage.', 'com/', 'e8c895e6c70ade8e4ef4a72354f42e97/', 'invoke.js'].join('');
+      c.appendChild(s);
+      window.adScriptLoaded = true;
+      window.lastAdShowTime = currentTime;
+    } catch(e) { return false; }
+  }
+  c.style.display = 'flex';
+  return true;
+}
+let lastReportText = "";
+
+function runCalculationCore() {
+  const totalUrls = parseFloat(document.getElementById('total-urls').value) || 1;
+  let usefulUrls = parseFloat(document.getElementById('useful-urls').value) || 0;
+  if (usefulUrls > totalUrls) usefulUrls = totalUrls;
+
+  const ttfb = parseFloat(document.getElementById('server-ttfb').value) || 350;
+  const renderType = document.getElementById('render-type').value;
+  const clickDepth = parseInt(document.getElementById('click-depth').value) || 1;
+  const domainDr = parseFloat(document.getElementById('domain-dr').value) || 0;
+
+  // 1. Calcular Inflación de Índice (Index Bloat %)
+  const trashUrls = totalUrls - usefulUrls;
+  const bloatPercent = (trashUrls / totalUrls) * 100;
+  const efficiencyPercent = 100 - bloatPercent;
+
+  // 2. Calcular Capacidad Base de Rastreo desde TTFB y DR
+  let speedFactor = 200 / ttfb;
+  if (speedFactor > 4.0) speedFactor = 4.0;
+  if (speedFactor < 0.1) speedFactor = 0.1;
+
+  let trustDemand = 150 + (domainDr * 120);
+
+  // 3. Aplicar Penalización de Renderizado JavaScript (WRS)
+  let renderPenalty = 1.0;
+  let renderNote = "HTML Estático Puro (Análisis instantáneo, 0% sobrecarga de cola)";
+  if (renderType === 'cms') {
+    renderPenalty = 0.65;
+    renderNote = "CMS Estándar (35% pérdida de capacidad por generación dinámica DOM)";
+  } else if (renderType === 'spa-js') {
+    renderPenalty = 0.15;
+    renderNote = "Client-Side JS / SPA (Penalización crítica de cola WRS -85%)";
+  }
+
+  // 4. Aplicar Multiplicador de Atenuación por Profundidad de Clics
+  let depthMultiplier = 1.0;
+  if (clickDepth === 3) depthMultiplier = 0.70;
+  if (clickDepth === 4) depthMultiplier = 0.30;
+
+  // Capacidad Diaria Final de Googlebot (Páginas/Día)
+  let dailyCapacity = Math.round(trustDemand * speedFactor * renderPenalty * depthMultiplier);
+  if (dailyCapacity < 1) dailyCapacity = 1;
+
+  // 5. Ciclo Completo de Rastreo del Sitio (Días)
+  const fullCrawlDays = totalUrls / dailyCapacity;
+
+  // 6. Pronóstico de Indexación de Nuevo Artículo
+  let indexSpeedText = "";
+  let indexMinutes = (totalUrls / dailyCapacity) * 180 * (bloatPercent > 50 ? 2.5 : 1.0);
+  if (renderType === 'static' && ttfb <= 150 && bloatPercent < 20) {
+    indexMinutes = Math.max(15, Math.round(ttfb / 4));
+  }
+
+  if (indexMinutes < 60) {
+    indexSpeedText = `~${Math.round(indexMinutes)} mins (Instantánea)`;
+  } else if (indexMinutes < 1440) {
+    indexSpeedText = `~${(indexMinutes / 60).toFixed(1)} horas`;
+  } else {
+    indexSpeedText = `~${Math.round(indexMinutes / 1440)} días (Riesgo de Sandbox)`;
+  }
+
+  const logHtml = `
+    <strong>[LOG] Auditoría Matemática Abierta de Googlebot (Núcleo WRS y Rastreo):</strong><br>
+    1. URLs Totales = ${totalUrls} | Páginas Útiles = ${usefulUrls} | URLs Basura = ${trashUrls} (Index Bloat = ${bloatPercent.toFixed(1)}%)<br>
+    2. TTFB del Servidor = ${ttfb}ms (Factor de Velocidad = ${speedFactor.toFixed(2)}x)<br>
+    3. Arquitectura: ${renderNote} (Multiplicador = ${renderPenalty})<br>
+    4. Profundidad de Clics = ${clickDepth} clic(s) (Multiplicador de Atenuación = ${depthMultiplier})<br>
+    5. Demanda por Confianza (DR ${domainDr}) = ${trustDemand} solicitudes base/día<br>
+    6. Capacidad Neta de Rastreo = ${dailyCapacity} págs/día<br>
+    7. Ciclo Completo de Rastreo del Índice = ${fullCrawlDays.toFixed(1)} días.
+  `;
+
+  lastReportText = `📊 REPORTE DE AUDITORÍA SEO TÉCNICA (CRAWL BUDGET):\n` +
+    `• Inflación de Índice (URLs Basura): ${bloatPercent.toFixed(1)}% (${trashUrls} de ${totalUrls} págs.)\n` +
+    `• Eficiencia Útil del Presupuesto Googlebot: ${efficiencyPercent.toFixed(1)}%\n` +
+    `• Tiempo de Respuesta del Servidor (TTFB): ${ttfb} ms\n` +
+    `• Capacidad Estimada de Rastreo: ~${dailyCapacity} págs/día\n` +
+    `• Ciclo Completo de Rastreo del Dominio: ${fullCrawlDays.toFixed(1)} días\n` +
+    `• Pronóstico de Indexación de Nuevo Contenido: ${indexSpeedText}\n` +
+    `Generado en IMPERIA Web Tools Hub`;
+
+  return {
+    bloat: bloatPercent.toFixed(1) + "%",
+    capacity: dailyCapacity.toLocaleString() + " págs/día",
+    efficiency: efficiencyPercent.toFixed(1) + "%",
+    fullCrawl: fullCrawlDays < 1 ? "< 1 día" : fullCrawlDays.toFixed(1) + " días",
+    indexSpeed: indexSpeedText,
+    rawBloat: bloatPercent,
+    rawCapacity: dailyCapacity,
+    rawDays: fullCrawlDays,
+    ttfb: ttfb,
+    renderType: renderType,
+    log: logHtml
+  };
+}
+
+function updatePreview() {
+  const data = runCalculationCore();
+  if (!data) return;
+
+  let zone = "🔥 Indexación Instantánea (Confianza de Referencia)";
+  let color = "var(--success)";
+  let barWidth = 92;
+
+  if (data.rawDays > 30 || data.rawBloat >= 70) {
+    zone = "🚨 COMA DE INDEXACIÓN: Rastreador ahogado por basura y latencia";
+    color = "var(--danger)";
+    barWidth = 15;
+  } else if (data.rawDays > 7 || data.rawBloat >= 40 || data.ttfb > 500) {
+    zone = "⚠️ Fuga de Presupuesto de Rastreo (Ciclo Lento)";
+    color = "var(--accent)";
+    barWidth = 50;
+  }
+
+  const preview = document.getElementById('live-preview-zone');
+  preview.innerText = zone;
+  preview.style.color = color;
+
+  const fill = document.getElementById('bar-fill');
+  fill.style.width = barWidth + '%';
+  fill.style.background = color;
+
+  const pLink = document.getElementById('partner-link');
+  if (pLink) {
+    if (data.ttfb > 400) {
+      pLink.innerText = "🔥 Migrar a Hosting VPS NVMe Rápido (TTFB < 100ms)";
+    } else {
+      pLink.innerText = "🚀 Seleccionar Hardware de Servidor y Proxies en Amazon";
+    }
+  }
+}
+
+function copyAuditReport() {
+  if (!lastReportText) return;
+  navigator.clipboard.writeText(lastReportText).then(() => {
+    const btn = document.getElementById('copy-report-btn');
+    const oldText = btn.innerText;
+    btn.innerText = "✅ ¡Reporte Copiado al Portapapeles!";
+    btn.style.background = "#dcfce7";
+    btn.style.color = "#166534";
+    setTimeout(() => {
+      btn.innerText = oldText;
+      btn.style.background = "#f8fafc";
+      btn.style.color = "var(--slate)";
+    }, 2500);
+  });
+}
+
+function calculateCrawlBudget() {
+  const data = runCalculationCore();
+  if (!data) return;
+
+  document.getElementById('res-bloat').innerText = data.bloat;
+  document.getElementById('res-capacity').innerText = data.capacity;
+  document.getElementById('res-efficiency').innerText = data.efficiency;
+  document.getElementById('res-full-crawl').innerText = data.fullCrawl;
+  document.getElementById('res-index-speed').innerText = data.indexSpeed;
+
+  const logBox = document.getElementById('math-log-container');
+  logBox.innerHTML = data.log;
+  logBox.style.display = 'block';
+
+  let verdict = "La arquitectura de su sitio está altamente optimizada para los rastreadores web. Un bajo nivel de inflación de índice y respuestas rápidas del servidor permiten a Googlebot indexar nuevos contenidos con latencia mínima.";
+
+  if (data.rawDays > 30 || data.rawBloat >= 70) {
+    verdict = `🚨 AGOTAMIENTO CRÍTICO DE PRESUPUESTO: Su dominio desperdicia hasta un ${data.bloat} de los recursos de rastreo en URLs duplicadas y basura técnica. Con su TTFB actual (${data.ttfb} ms), un rastreo completo tarda ${data.fullCrawl}. Las páginas comerciales nuevas corren el riesgo de quedarse atrapadas en "Descubierta: actualmente sin indexar" durante meses. Bloquee la paginación y filtros en robots.txt de inmediato.`;
+  } else if (data.renderType === 'spa-js') {
+    verdict = `⚠️ PENALIZACIÓN POR RENDERIZADO CLIENT-SIDE (WRS): Depender de JavaScript pesado sin Renderizado del Lado del Servidor (SSR) obliga a Googlebot a encolar sus URLs para ejecutar scripts, quemando hasta el 85% de su presupuesto de rastreo. Migre las páginas clave a HTML estático o SSR.`;
+  }
+
+  document.getElementById('skynet-verdict').innerText = verdict;
+  document.getElementById('results-box').style.display = 'block';
+  document.getElementById('skynet-container').style.display = 'block';
+  document.getElementById('seo-box').style.display = 'block';
+
+  updatePreview();
+  showAdsFunc();
+}
+</script>
+</body>
+</html>
